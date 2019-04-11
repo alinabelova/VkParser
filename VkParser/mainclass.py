@@ -1,11 +1,23 @@
 from PyQt5 import QtWidgets 
 from mydesign import Ui_MainWindow  # importing our generated file 
 import sys
+#from post import post
 import requests
 import json
 from time import sleep
 import time
 import csv
+
+class post(object):
+    def __init__(self, id, text, datetime, ownerId, likesCount, repostsCount, commentsCount, viewsCount):
+        self.id = id
+        self.text = text
+        self.datetime = datetime
+        self.ownerId = ownerId
+        self.likesCount = likesCount
+        self.repostsCount = repostsCount
+        self.commentsCount = commentsCount
+        self.viewsCount = viewsCount
 
 class mywindow(QtWidgets.QMainWindow): 
     def __init__(self):
@@ -66,39 +78,41 @@ def get_data(post):
         reposts = post['reposts']['count']
     except:
         reposts = 0
-    data = {
-        'id': post_id,
-        'datetime': time.strftime("%d.%m.%Y, %H:%M:%S", time.localtime(post['date'])),
-        'likes': post_likes,
-        'text': post['text'],
-        'comments': comments,
-        'reposts': reposts
-        }
+  #  data = {
+   #     id: post_id,
+   #     datetime: time.strftime("%d.%m.%Y, %H:%M:%S", time.localtime(post['date'])),
+   #     likes: post_likes,
+    #    text: post['text'],
+     #   comments: comments,
+      #  reposts: reposts
+       # }
+    data = post(post_id, post['text'], time.strftime("%d.%m.%Y, %H:%M:%S", time.localtime(post['date'])), 1, post_likes, reposts, comments, 0)
     return data
 
 def parse_group(group, date_start):
-    group_id = '-' + group
-    #group_id = '-34183390'
+  #  group_id = '-' + group
+    group_id = '-34183390'
     offset = 0
     all_posts = []
 
-    while True:
-        sleep(1)
-        r = requests.get('https://api.vk.com/method/wall.get', params={'owner_id': group_id, 'offset': offset, 'count': 100, 'access_token': 'd933e827d933e827d933e82762d95bd7acdd933d933e827857a5be3f0d490a5fdc7bfbe', 'v': '5.92'})
-        posts = r.json()['response']['items']
-        all_posts.extend(posts)
-        oldest_post_date = posts[-1]['date']
-        offset += 100
-        if oldest_post_date < date_start:
-            break
+ #   while True:
+   #     sleep(1)
+    r = requests.get('https://api.vk.com/method/wall.get', params={'owner_id': group_id, 'offset': offset, 'count': 30, 'access_token': 'd933e827d933e827d933e82762d95bd7acdd933d933e827857a5be3f0d490a5fdc7bfbe', 'v': '5.92'})
+    posts = r.json()['response']['items']
+    all_posts.extend(posts)
+  #      oldest_post_date = posts[-1]['date']
+  #      offset += 100
+  #      if oldest_post_date < date_start:
+   #         break
     data_posts = []
-    write_csv_headers()
+   #  write_csv_headers()
     for post in all_posts:
-        post_data = get_data(post)
-        write_csv(post_data)
+        data_posts.extend(get_data(post))
+    #    post_data = get_data(post)
+  #       write_csv(post_data)
 
     print(len(all_posts))
-  #  write_json(r.json())
+    write_json(data_posts.json())
 
 #if __name__ == '__main__':
  #   main()
