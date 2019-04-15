@@ -7,6 +7,7 @@ import json
 from time import sleep
 import time
 import csv
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 class Post(object):
     def __init__(self, id, text, datetime, ownerId, likesCount, repostsCount, commentsCount, viewsCount):
@@ -104,6 +105,16 @@ def get_data(post):
     return data
 
 def parse_group(group, date_start):
+    corpus = ["This is very strange",
+          "This is very nice"]
+    vectorizer = TfidfVectorizer()
+    X = vectorizer.fit_transform(corpus)
+    idf = vectorizer.idf_
+    print (dict(zip(vectorizer.get_feature_names(), idf)))
+
+    print (vectorizer.vocabulary_)
+    print ((X.todense())) 
+
     group_id = '-' + group
    # group_id = '-34183390'
     offset = 0
