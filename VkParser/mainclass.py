@@ -8,6 +8,8 @@ from time import sleep
 import time
 import csv
 from sklearn.feature_extraction.text import TfidfVectorizer
+from stop_words import get_stop_words
+import numpy as np
 
 class Post(object):
     def __init__(self, id, text, datetime, ownerId, likesCount, repostsCount, commentsCount, viewsCount):
@@ -105,16 +107,6 @@ def get_data(post):
     return data
 
 def parse_group(group, date_start):
-    corpus = ["This is very strange",
-          "This is very nice"]
-    vectorizer = TfidfVectorizer()
-    X = vectorizer.fit_transform(corpus)
-    idf = vectorizer.idf_
-    print (dict(zip(vectorizer.get_feature_names(), idf)))
-
-    print (vectorizer.vocabulary_)
-    print ((X.todense())) 
-
     group_id = '-' + group
    # group_id = '-34183390'
     offset = 0
@@ -122,7 +114,7 @@ def parse_group(group, date_start):
 
  #   while True:
    #     sleep(1)
-    r = requests.get('https://api.vk.com/method/wall.get', params={'owner_id': group_id, 'offset': offset, 'count': 30, 'access_token': 'd933e827d933e827d933e82762d95bd7acdd933d933e827857a5be3f0d490a5fdc7bfbe', 'v': '5.92'})
+    r = requests.get('https://api.vk.com/method/wall.get', params={'owner_id': group_id, 'offset': offset, 'count': 4, 'access_token': 'd933e827d933e827d933e82762d95bd7acdd933d933e827857a5be3f0d490a5fdc7bfbe', 'v': '5.92'})
     posts = r.json()['response']['items']
     all_posts.extend(posts)
   #      oldest_post_date = posts[-1]['date']
@@ -137,6 +129,28 @@ def parse_group(group, date_start):
   #       write_csv(post_data)
 
     write_json(data_posts, group_id)
+  #  corpus = ["This is very strange",
+ #         "This is very nice"]
+    my_stop_words = get_stop_words('ru')
+
+    vectorizer = TfidfVectorizer(ngram_range=(1,1), stop_words=my_stop_words)
+   # vectorizer = CountVectorizer()
+    X = vectorizer.fit_transform([data_post.text for data_post in data_posts])
+    idf = vectorizer.idf_
+    print (dict(zip(vectorizer.get_feature_names(), idf)))
+
+#    print (vectorizer.vocabulary_)
+    print ((X.todense())) 
+    vocab = np.array(vectorizer.get_feature_names())
+    print ("Document term matrix:")
+    chunk_names = ['Chunk-0', 'Chunk-1', 'Chunk-2', 'Chunk-3']
+    formatted_row = '{:>12}' * (len(chunk_names) + 1)
+    print ('\n', formatted_row.format('Word', *chunk_names), '\n')
+
+    for word, item in zip(vocab, X.T) :
+        output = [str(x) for x in item.data]
+       # print(formatted_row.format(word, *output))
+
 
 #if __name__ == '__main__':
  #   main()
