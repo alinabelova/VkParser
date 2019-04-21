@@ -12,6 +12,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
 from stop_words import get_stop_words
 import numpy as np
+from concepts import Context
 
 class Post(object):
     def __init__(self, id, text, datetime, ownerId, likesCount, repostsCount, commentsCount, viewsCount):
@@ -103,15 +104,6 @@ def get_data(post):
         views = post['views']['count']
     except:
         views = 0
-  #  data = {
-   #     id: post_id,
-   #     datetime: time.strftime("%d.%m.%Y, %H:%M:%S", time.localtime(post['date'])),
-   #     likes: post_likes,
-    #    text: post['text'],
-     #   comments: comments,
-      #  reposts: reposts
-       # }
-  
     data = Post(post_id, post['text'], time.strftime("%d.%m.%Y, %H:%M:%S", time.localtime(post['date'])), post['owner_id'], post_likes, reposts, comments, views)
     return data
 
@@ -145,6 +137,55 @@ def extract_topn_from_vector(feature_names, sorted_items, topn=10):
     
     return results
 
+def get_formal_concepts(data_posts, keywords):
+    matrix = []
+    obj = []
+    for data_post in data_posts:
+        count = 0
+        obj.append(data_post.id)
+        for k in keywords:
+            if k.word.lower() in data_post.text.lower():
+                t = [x for x in matrix if x[0][0]  == data_post.id]
+                if not t:
+                    matrix.append(([data_post.id], [k.word]))
+                else:
+                    t = (t[0][0], t[0][1].append(k.word))
+        if False:            
+       # if count < 0:
+            data_post.is_positive = False
+            for a, *b in matrix:
+                print(a, ' '.join(map(str, b)))
+    for i in range(len(matrix)):        
+        for j in range(i + 1, len(matrix)):
+            crossing = sorted(list(set(matrix[i][1]) & set(matrix[j][1])))
+            if not crossing:
+                continue
+            tt = [x for x in matrix if crossing == sorted(x[1])]
+            if tt:
+                if matrix[i][0][0] not in tt[0][0]:
+                    tt[0][0].append(matrix[i][0][0])
+                if matrix[j][0][0] not in tt[0][0]:
+                    tt[0][0].append(matrix[j][0][0])
+                tt = (tt[0][0], crossing)
+            else:
+                matrix.append(([matrix[i][0][0], matrix[j][0][0]], crossing))
+    
+    attributes = [x.word for x in keywords]
+    all_attributes = [x for x in matrix if sorted(attributes) == sorted(x[1])]
+    all_objects = [x for x in matrix if sorted(obj) == sorted(x[1])]
+    if not all_attributes:
+        matrix.append(([], attributes))
+    if not all_objects:
+        matrix.append((obj, []))
+    matrix = sorted(matrix, key=lambda x: len(x[0]))
+
+    file1 = open("concepts.txt","a") 
+    for m in matrix:
+        print(m)
+        file1.write(str(m) + '\n')
+    file1.close()
+
+
 def parse_group(group):
     group_id = '-' + group
    # group_id = '-34183390'
@@ -153,7 +194,7 @@ def parse_group(group):
 
  #   while True:
    #     sleep(1)
-    r = requests.get('https://api.vk.com/method/wall.get', params={'owner_id': group_id, 'offset': offset, 'count': 4, 'access_token': 'd933e827d933e827d933e82762d95bd7acdd933d933e827857a5be3f0d490a5fdc7bfbe', 'v': '5.92'})
+    r = requests.get('https://api.vk.com/method/wall.get', params={'owner_id': group_id, 'offset': offset, 'count': 30, 'access_token': 'd933e827d933e827d933e82762d95bd7acdd933d933e827857a5be3f0d490a5fdc7bfbe', 'v': '5.92'})
     posts = r.json()['response']['items']
     all_posts.extend(posts)
   #      oldest_post_date = posts[-1]['date']
@@ -187,7 +228,7 @@ def parse_group(group):
     feature_names=cv.get_feature_names()
     #all keywords 
     keywords = []
-    matrix = []
+    
     #generate tf-idf for the given document
     for data_post in data_posts:
         tf_idf_vector=tfidf_transformer.transform(cv.transform([data_post.text]))
@@ -198,44 +239,75 @@ def parse_group(group):
         result = ''
         if results:
             result = next(iter(results))
+        if result != '':
             keyword = KeyWord(data_post.id, result, 1)
-        else:
-            keyword = KeyWord(data_post.id, result, -1)
-        keywords.append(keyword)
+            keywords.append(keyword)
  
+   
     
-    for data_post in data_posts:
-        count = 0
-        for k in keywords:
-            if k.word in data_post.text:
-                count += k.is_positive
-        if count < 0:
-            data_post.is_positive = False
-    return keywords
-      #    print (vectorizer.vocabulary_)
- #   print ((X.todense())) 
-  #  vocab = np.array(vectorizer.get_feature_names())
-   # print ("Document term matrix:")
-    #chunk_names = ['Chunk-0', 'Chunk-1', 'Chunk-2', 'Chunk-3']
-    #formatted_row = '{:>12}' * (len(chunk_names) + 1)
-    #print ('\n', formatted_row.format('Word', *chunk_names), '\n')
+    obj = ['g1', 'g2', 'g3', 'g4']
+    atr = ['m1', 'm2', 'm3', 'm4']
+    matrixTest = []
+    aMat = [[ 0 for i in range(4)] for j in range(4)]
+    aMat[0][2] = 1
+    aMat[0][3] = 1
 
-  #  for word, item in zip(vocab, X.T) :
-   #     output = [str(x) for x in item.data]
-       # print(formatted_row.format(word, *output))
+    aMat[1][1] = 1
+    aMat[1][2] = 1
 
+    aMat[2][0] = 1
+    aMat[2][3] = 1
+
+    aMat[3][0] = 1
+    aMat[3][1] = 1
+    aMat[3][2] = 1
+
+    for i in range(len(aMat)):
+        atri = []
+        for j in range(len(aMat[i])):
+            if aMat[i][j] == 1:
+                atri.append(atr[j])
+        matrixTest.append(([obj[i]], atri))
+
+        #list(set(matrixTest[1][1]) & set(matrixTest[3][1]))
+    resultMatrix = []
+    
+
+    matrixTestB = []
+    for j in range(len(aMat[0])):
+        obji = []
+        for i in range(len(aMat)):
+            if aMat[i][j] == 1:
+                obji.append(obj[i])
+        matrixTestB.append((atr[j], obji))
+        
+    c = Context.fromstring('''
+  |m1   |m2    |m3   |m4        |
+g1|  X  |      |  X  |   X      |
+g2|  X  |  X   |  X  |          |
+g3|  X  |      |     |     X    |
+g4|  X  |   X  |  X  |    X     |
+''')
+  #  print(c.intension(['King Arthur', 'Sir Robin']))
+  #  print(c.extension(['knight', 'mysterious']))
+   # for extent, intent in c.lattice:
+  #      print('%r %r' % (extent, intent))
+    return data_posts, keywords
 
 if __name__ == '__main__':
     common_keywords = []
-    common_keywords.extend(parse_group('34183390')) #https://vk.com/public34183390
-    common_keywords.extend(parse_group('54767216')) #https://vk.com/kraschp
-    common_keywords.extend(parse_group('59804801')) #https://vk.com/krsk_overhear
+    data_posts = []
+    common_keywords.extend(parse_group('34183390')[1]) #https://vk.com/public34183390
+    data_posts.extend(parse_group('34183390')[0]) #https://vk.com/public34183390
 
-    # now print the results
-    print("\n===Keywords===")
-    for k in common_keywords:
-      print(k.post_id)
-      print(k.word)
+    common_keywords.extend(parse_group('54767216')[1]) #https://vk.com/kraschp
+    data_posts.extend(parse_group('54767216')[0]) #https://vk.com/public34183390
+
+    common_keywords.extend(parse_group('59804801')[1]) #https://vk.com/krsk_overhear
+    data_posts.extend(parse_group('59804801')[0]) #https://vk.com/public34183390
+
+    get_formal_concepts(data_posts, common_keywords)
+
 #app = QtWidgets.QApplication([])
  
 #application = mywindow()
