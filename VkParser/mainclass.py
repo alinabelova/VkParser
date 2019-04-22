@@ -140,16 +140,17 @@ def extract_topn_from_vector(feature_names, sorted_items, topn=10):
 def get_formal_concepts(data_posts, keywords):
     matrix = []
     obj = []
+    attributes = list(set([x.word for x in keywords]))
     for data_post in data_posts:
         count = 0
         obj.append(data_post.id)
-        for k in keywords:
-            if k.word.lower() in data_post.text.lower():
+        for k in attributes:
+            if k.lower() in data_post.text.lower():
                 t = [x for x in matrix if x[0][0]  == data_post.id]
                 if not t:
-                    matrix.append(([data_post.id], [k.word]))
+                    matrix.append(([data_post.id], [k]))
                 else:
-                    t = (t[0][0], t[0][1].append(k.word))
+                    t = (t[0][0], t[0][1].append(k))
         if False:            
        # if count < 0:
             data_post.is_positive = False
@@ -170,7 +171,7 @@ def get_formal_concepts(data_posts, keywords):
             else:
                 matrix.append(([matrix[i][0][0], matrix[j][0][0]], crossing))
     
-    attributes = [x.word for x in keywords]
+    
     all_attributes = [x for x in matrix if sorted(attributes) == sorted(x[1])]
     all_objects = [x for x in matrix if sorted(obj) == sorted(x[1])]
     if not all_attributes:
@@ -194,7 +195,7 @@ def parse_group(group):
 
  #   while True:
    #     sleep(1)
-    r = requests.get('https://api.vk.com/method/wall.get', params={'owner_id': group_id, 'offset': offset, 'count': 30, 'access_token': 'd933e827d933e827d933e82762d95bd7acdd933d933e827857a5be3f0d490a5fdc7bfbe', 'v': '5.92'})
+    r = requests.get('https://api.vk.com/method/wall.get', params={'owner_id': group_id, 'offset': offset, 'count': 30, 'access_token': 'd933e827d933e827d933e82762d95bd7acdd933d933e827857a5be3f0d490a5fdc7bfbe', 'v': '5.95'})
     posts = r.json()['response']['items']
     all_posts.extend(posts)
   #      oldest_post_date = posts[-1]['date']
