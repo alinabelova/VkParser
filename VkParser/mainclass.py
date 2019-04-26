@@ -137,6 +137,11 @@ def extract_topn_from_vector(feature_names, sorted_items, topn=10):
     
     return results
 
+def average_concept_like(concepts, data_posts):
+    for concept in concepts:
+        like_avg = sum([data_post.likesCount for data_post in data_posts if data_post.id in concept[0]]) / len(concept[0])
+        print(like_avg)
+
 def get_formal_concepts(data_posts, keywords):
     matrix = []
     obj = []
@@ -171,7 +176,7 @@ def get_formal_concepts(data_posts, keywords):
             else:
                 matrix.append(([matrix[i][0][0], matrix[j][0][0]], crossing))
     
-    
+    average_concept_like(matrix, data_posts)
     all_attributes = [x for x in matrix if sorted(attributes) == sorted(x[1])]
     all_objects = [x for x in matrix if sorted(obj) == sorted(x[1])]
     if not all_attributes:
