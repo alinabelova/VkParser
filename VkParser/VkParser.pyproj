@@ -26,6 +26,12 @@
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="post_keyword.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="like.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="mainclass.py">
       <SubType>Code</SubType>
     </Compile>

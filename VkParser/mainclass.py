@@ -1,7 +1,6 @@
 from PyQt5 import QtWidgets 
 from mydesign import Ui_MainWindow  # importing our generated file 
 import sys
-#from post import post
 import requests
 import json
 from time import sleep
@@ -13,29 +12,11 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from stop_words import get_stop_words
 import numpy as np
 from concepts import Context
-
-class Post(object):
-    def __init__(self, id, text, datetime, ownerId, likesCount, repostsCount, commentsCount, viewsCount):
-        self.id = id
-        self.text = text
-        self.datetime = datetime
-        self.ownerId = ownerId
-        self.likesCount = likesCount
-        self.repostsCount = repostsCount
-        self.commentsCount = commentsCount
-        self.viewsCount = viewsCount
-        self.is_positive = True
-class PostEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Post):
-            return obj.__dict__
-        return json.JSONEncoder.default(self, obj)
-
-class KeyWord(object):
-    def __init__(self, post_id, word, is_positive):
-        self.post_id = post_id
-        self.word = word
-        self.is_positive = is_positive
+from colour import Color
+import graphviz as gv
+from post import *
+from like import *
+from post_keyword import KeyWord
 
 class mywindow(QtWidgets.QMainWindow): 
     def __init__(self):
@@ -56,11 +37,8 @@ class mywindow(QtWidgets.QMainWindow):
         parse_group('54767216', date_start) #https://vk.com/kraschp
         parse_group('59804801', date_start) #https://vk.com/krsk_overhear
 
-def write_json(data, id):
-    with open('posts' + id + '.json', 'w', encoding="utf-8") as outfile:
-        json.dump(data, outfile, cls=PostEncoder, ensure_ascii=False)
-  #  with open('posts.json', 'w', encoding="utf-8") as file:
-   #     json.dump(data, file, indent=2, ensure_ascii=False)
+
+
 def write_csv_headers():
     with open('posts_data.csv', 'a', newline='') as file:
         writer = csv.writer(file)
@@ -138,9 +116,15 @@ def extract_topn_from_vector(feature_names, sorted_items, topn=10):
     return results
 
 def average_concept_like(concepts, data_posts):
-    for concept in concepts:
-        like_avg = sum([data_post.likesCount for data_post in data_posts if data_post.id in concept[0]]) / len(concept[0])
+    for index, concept in enumerate(concepts):
+        like_avg = 0
+        if len(concept[0]) > 0:          
+            like_avg = sum([data_post.likesCount for data_post in data_posts if data_post.id in concept[0]]) / len(concept[0])
+        concept_list = list(concept)
+        concept_list.append(like_avg)
+        concepts[index] = tuple(concept_list)
         print(like_avg)
+    return concepts
 
 def get_formal_concepts(data_posts, keywords):
     matrix = []
@@ -156,8 +140,7 @@ def get_formal_concepts(data_posts, keywords):
                     matrix.append(([data_post.id], [k]))
                 else:
                     t = (t[0][0], t[0][1].append(k))
-        if False:            
-       # if count < 0:
+        if False:
             data_post.is_positive = False
             for a, *b in matrix:
                 print(a, ' '.join(map(str, b)))
@@ -176,54 +159,83 @@ def get_formal_concepts(data_posts, keywords):
             else:
                 matrix.append(([matrix[i][0][0], matrix[j][0][0]], crossing))
     
-    average_concept_like(matrix, data_posts)
+    
     all_attributes = [x for x in matrix if sorted(attributes) == sorted(x[1])]
     all_objects = [x for x in matrix if sorted(obj) == sorted(x[1])]
     if not all_attributes:
         matrix.append(([], attributes))
     if not all_objects:
         matrix.append((obj, []))
-    matrix = sorted(matrix, key=lambda x: len(x[0]))
-
+    matrix = average_concept_like(matrix, data_posts)
+    matrix = sorted(matrix, key=lambda x: len(x[1]))
+    d = gv.Digraph(
+        directory=None, edge_attr=dict(dir='none', labeldistance='1.5', minlen='2'))
+    red = Color("red")
+    colors = list(red.range_to(Color("green"), len(matrix)))
     file1 = open("concepts.txt","a") 
     for m in matrix:
         print(m)
         file1.write(str(m) + '\n')
     file1.close()
-
+    
+    matrixForGraph = []
+    for tup in matrix:
+        if len([x for x in matrixForGraph if x[1] == tup[1]]) == 0:
+           matrixForGraph.append(tup)
+    matrixForGraph = sorted(matrixForGraph, key=lambda x: x[2])
+    
+    i = 0
+    for m in matrixForGraph:   
+        nodename = ', '.join([str(x) for x in m[1]])
+        if matrixForGraph[0] == m:
+            node_label = ' '
+        else:
+            node_label = nodename
+        d.node(nodename, node_label, color=colors[i].hex_l, style='filled')
+        t = [x for x in matrixForGraph if set(m[1]).issubset(x[1]) and len(m[1]) < len(x[1])]
+        if len(t) > 0:
+            all_neighbours = sorted(t, key=lambda x: len(x[1]))
+            nearest_neighbours = [x for x in all_neighbours if len(x[1]) == len(all_neighbours[0][1])]
+          
+            for neighbour in nearest_neighbours:
+               node_name2 = ', '.join([str(x) for x in neighbour[1]])               
+               d.edges([(node_label, node_name2)])
+        i += 1
+    d.view()
 
 def parse_group(group):
     group_id = '-' + group
-   # group_id = '-34183390'
     offset = 0
     all_posts = []
 
- #   while True:
-   #     sleep(1)
-    r = requests.get('https://api.vk.com/method/wall.get', params={'owner_id': group_id, 'offset': offset, 'count': 30, 'access_token': 'd933e827d933e827d933e82762d95bd7acdd933d933e827857a5be3f0d490a5fdc7bfbe', 'v': '5.95'})
+    r = requests.get('https://api.vk.com/method/wall.get', params={'owner_id': group_id, 'offset': offset, 'count': 10, 'access_token': 'd933e827d933e827d933e82762d95bd7acdd933d933e827857a5be3f0d490a5fdc7bfbe', 'v': '5.95'})
     posts = r.json()['response']['items']
     all_posts.extend(posts)
-  #      oldest_post_date = posts[-1]['date']
-  #      offset += 100
-  #      if oldest_post_date < date_start:
-   #         break
+
     data_posts = []
-   #  write_csv_headers()
+    likes_response = []
+    all_likes = []
+
     for p in all_posts:
         data_posts.append(get_data(p))
-    #    post_data = get_data(post)
-  #       write_csv(post_data)
+        r = requests.get('https://api.vk.com/method/likes.getList', 
+                         params={'owner_id': group_id, 'offset': offset, 'type': 'post', 'item_id': p['id'],
+                                 'filter': 'likes', 'friends_only': 0, 'extended': 1, 'count': p['likes']['count'],
+                                 'access_token': 'd933e827d933e827d933e82762d95bd7acdd933d933e827857a5be3f0d490a5fdc7bfbe', 'v': '5.95'})
+        likes_response.extend(r.json()['response']['items'])
+        
+    for like_response in likes_response:
+        like = Like(group_id, like_response['id'], like_response['type'],
+                    like_response['first_name'], like_response['last_name'])
+        all_likes.append(like)
+    write_likes_json(all_likes, group_id)
 
-    write_json(data_posts, group_id)
-  #  corpus = ["This is very strange",
- #         "This is very nice"]
+    write_posts_json(data_posts, group_id)
     my_stop_words = get_stop_words('ru')
 
     vectorizer = TfidfVectorizer(ngram_range=(1,1), stop_words=my_stop_words)
-   # vectorizer = CountVectorizer()
     X = vectorizer.fit_transform([data_post.text for data_post in data_posts])
     idf = vectorizer.idf_
-    #print (dict(zip(vectorizer.get_feature_names(), idf)))
    
    #***************
 
@@ -247,57 +259,8 @@ def parse_group(group):
             result = next(iter(results))
         if result != '':
             keyword = KeyWord(data_post.id, result, 1)
-            keywords.append(keyword)
- 
-   
-    
-    obj = ['g1', 'g2', 'g3', 'g4']
-    atr = ['m1', 'm2', 'm3', 'm4']
-    matrixTest = []
-    aMat = [[ 0 for i in range(4)] for j in range(4)]
-    aMat[0][2] = 1
-    aMat[0][3] = 1
-
-    aMat[1][1] = 1
-    aMat[1][2] = 1
-
-    aMat[2][0] = 1
-    aMat[2][3] = 1
-
-    aMat[3][0] = 1
-    aMat[3][1] = 1
-    aMat[3][2] = 1
-
-    for i in range(len(aMat)):
-        atri = []
-        for j in range(len(aMat[i])):
-            if aMat[i][j] == 1:
-                atri.append(atr[j])
-        matrixTest.append(([obj[i]], atri))
-
-        #list(set(matrixTest[1][1]) & set(matrixTest[3][1]))
-    resultMatrix = []
-    
-
-    matrixTestB = []
-    for j in range(len(aMat[0])):
-        obji = []
-        for i in range(len(aMat)):
-            if aMat[i][j] == 1:
-                obji.append(obj[i])
-        matrixTestB.append((atr[j], obji))
+            keywords.append(keyword) 
         
-    c = Context.fromstring('''
-  |m1   |m2    |m3   |m4        |
-g1|  X  |      |  X  |   X      |
-g2|  X  |  X   |  X  |          |
-g3|  X  |      |     |     X    |
-g4|  X  |   X  |  X  |    X     |
-''')
-  #  print(c.intension(['King Arthur', 'Sir Robin']))
-  #  print(c.extension(['knight', 'mysterious']))
-   # for extent, intent in c.lattice:
-  #      print('%r %r' % (extent, intent))
     return data_posts, keywords
 
 if __name__ == '__main__':
