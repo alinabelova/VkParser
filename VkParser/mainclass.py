@@ -1,5 +1,3 @@
-from PyQt5 import QtWidgets 
-from mydesign import Ui_MainWindow  # importing our generated file 
 import sys
 import requests
 import json
@@ -17,102 +15,80 @@ import graphviz as gv
 from post import *
 from like import *
 from post_keyword import KeyWord
-
-class mywindow(QtWidgets.QMainWindow): 
-    def __init__(self):
- 
-        super(mywindow, self).__init__()
- 
-        self.ui = Ui_MainWindow()
-    
-        self.ui.setupUi(self)
-        self.ui.pushButton.clicked.connect(self.btnClicked) # connecting the clicked signal with btnClicked slot
- 
-    def btnClicked(self): 
-        self.ui.label.setText("Button Clicked")
-        search_phrases = self.ui.textEdit.toPlainText()
-        group_id = self.ui.lineEdit.text()
-        date_start = self.ui.dateTimeEdit.dateTime().toMSecsSinceEpoch()
-        parse_group('34183390', date_start) #https://vk.com/public34183390
-        parse_group('54767216', date_start) #https://vk.com/kraschp
-        parse_group('59804801', date_start) #https://vk.com/krsk_overhear
-
-
+import pymorphy2
+import os
 
 def write_csv_headers():
     with open('posts_data.csv', 'a', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(('Id',
-                         'DateTime',
-                         'Comments',
-                         'Likes',
-                         'Reposts',                         
-                         'Text'
-                         ))
+            'DateTime',
+            'Comments',
+            'Likes',
+            'Reposts',
+            'Text'
+            ))
 
 def write_csv(data):
     with open('posts_data.csv', 'a', newline='', encoding="windows-1251") as file:
         writer = csv.writer(file)
         writer.writerow((data['id'],
-                         data['datetime'],     
-                         data['comments'],
-                         data['likes'],
-                         data['reposts'],
-                         data['text'].replace('\n','')                      
-                         ))
+            data['datetime'],
+            data['comments'],
+            data['likes'],
+            data['reposts'],
+            data['text'].replace('\n','')
+            ))
 
 def get_data(post):
     try:
         post_id = post['id']
     except:
         post_id = 0
+
     try:
         post_likes = post['likes']['count']
     except:
         post_likes = 0
+
     try:
         comments = post['comments']['count']
     except:
         comments = 0
+
     try:
         reposts = post['reposts']['count']
     except:
         reposts = 0
+
     try:
         views = post['views']['count']
     except:
         views = 0
+
     data = Post(post_id, post['text'], time.strftime("%d.%m.%Y, %H:%M:%S", time.localtime(post['date'])), post['owner_id'], post_likes, reposts, comments, views)
     return data
 
-
- 
 def sort_coo(coo_matrix):
     tuples = zip(coo_matrix.col, coo_matrix.data)
     return sorted(tuples, key=lambda x: (x[1], x[0]), reverse=True)
- 
+
 def extract_topn_from_vector(feature_names, sorted_items, topn=10):
     """get the feature names and tf-idf score of top n items"""
-    
-    #use only topn items from vector
     sorted_items = sorted_items[:topn]
- 
+
     score_vals = []
     feature_vals = []
-    
+
     # word index and corresponding tf-idf score
     for idx, score in sorted_items:
-        
-        #keep track of feature name and its corresponding score
         score_vals.append(round(score, 3))
         feature_vals.append(feature_names[idx])
- 
-    #create a tuples of feature,score
-    #results = zip(feature_vals,score_vals)
+    
     results= {}
+
     for idx in range(len(feature_vals)):
         results[feature_vals[idx]]=score_vals[idx]
-    
     return results
 
 def average_concept_like(concepts, data_posts):
@@ -130,12 +106,13 @@ def get_formal_concepts(data_posts, keywords):
     matrix = []
     obj = []
     attributes = list(set([x.word for x in keywords]))
+
     for data_post in data_posts:
         count = 0
         obj.append(data_post.id)
         for k in attributes:
             if k.lower() in data_post.text.lower():
-                t = [x for x in matrix if x[0][0]  == data_post.id]
+                t = [x for x in matrix if x[0][0] == data_post.id]
                 if not t:
                     matrix.append(([data_post.id], [k]))
                 else:
@@ -144,7 +121,8 @@ def get_formal_concepts(data_posts, keywords):
             data_post.is_positive = False
             for a, *b in matrix:
                 print(a, ' '.join(map(str, b)))
-    for i in range(len(matrix)):        
+
+    for i in range(len(matrix)):
         for j in range(i + 1, len(matrix)):
             crossing = sorted(list(set(matrix[i][1]) & set(matrix[j][1])))
             if not crossing:
@@ -158,10 +136,10 @@ def get_formal_concepts(data_posts, keywords):
                 tt = (tt[0][0], crossing)
             else:
                 matrix.append(([matrix[i][0][0], matrix[j][0][0]], crossing))
-    
-    
+
     all_attributes = [x for x in matrix if sorted(attributes) == sorted(x[1])]
     all_objects = [x for x in matrix if sorted(obj) == sorted(x[1])]
+    
     if not all_attributes:
         matrix.append(([], attributes))
     if not all_objects:
@@ -171,36 +149,47 @@ def get_formal_concepts(data_posts, keywords):
     d = gv.Digraph(
         directory=None, edge_attr=dict(dir='none', labeldistance='1.5', minlen='2'))
     red = Color("red")
-    colors = list(red.range_to(Color("green"), len(matrix)))
-    file1 = open("concepts.txt","a") 
+    file1 = open("concepts.txt","a")
     for m in matrix:
         print(m)
         file1.write(str(m) + '\n')
     file1.close()
-    
     matrixForGraph = []
+    
     for tup in matrix:
         if len([x for x in matrixForGraph if x[1] == tup[1]]) == 0:
-           matrixForGraph.append(tup)
+            matrixForGraph.append(tup)
     matrixForGraph = sorted(matrixForGraph, key=lambda x: x[2])
-    
-    i = 0
-    for m in matrixForGraph:   
+    colors = list(red.range_to(Color("green"), len(matrixForGraph)))
+        
+    color_counter = 0
+    for m in matrixForGraph:
         nodename = ', '.join([str(x) for x in m[1]])
         if matrixForGraph[0] == m:
             node_label = ' '
         else:
             node_label = nodename
-        d.node(nodename, node_label, color=colors[i].hex_l, style='filled')
-        t = [x for x in matrixForGraph if set(m[1]).issubset(x[1]) and len(m[1]) < len(x[1])]
+        d.node(nodename, node_label, color=colors[color_counter].hex_l, style='filled')
+        color_counter += 1
+            
+        t = [x for x in matrixForGraph if set(m[1]).issubset(set(x[1])) and len(set(m[1])) != len(set(x[1]))]
+            
         if len(t) > 0:
             all_neighbours = sorted(t, key=lambda x: len(x[1]))
-            nearest_neighbours = [x for x in all_neighbours if len(x[1]) == len(all_neighbours[0][1])]
-          
+            excluded_neighbours = []
+            nearest_neighbours = all_neighbours
+            for i in range(len(all_neighbours)):
+                for j in range(i + 1, len(all_neighbours)):
+                    if i!=j and set(all_neighbours[i][1]).issubset(set(all_neighbours[j][1])) and not all_neighbours[j] in excluded_neighbours:
+                        excluded_neighbours.append(all_neighbours[j])
+            if len(excluded_neighbours) > 0:
+                print(excluded_neighbours)
+                nearest_neighbours = [item for item in all_neighbours if item not in excluded_neighbours]
+                
             for neighbour in nearest_neighbours:
-               node_name2 = ', '.join([str(x) for x in neighbour[1]])               
-               d.edges([(node_label, node_name2)])
-        i += 1
+                node_name2 = ', '.join([str(x) for x in neighbour[1]])
+                d.edges([(node_label, node_name2)])
+           
     d.view()
 
 def parse_group(group):
@@ -246,39 +235,35 @@ def parse_group(group):
     feature_names=cv.get_feature_names()
     #all keywords 
     keywords = []
-    
+    morph = pymorphy2.MorphAnalyzer()
+
     #generate tf-idf for the given document
     for data_post in data_posts:
         tf_idf_vector=tfidf_transformer.transform(cv.transform([data_post.text]))
-        #sort the tf-idf vectors by descending order of scores
-        sorted_items=sort_coo(tf_idf_vector.tocoo()) 
+       
+       #sort the tf-idf vectors by descending order of scores
+        sorted_items=sort_coo(tf_idf_vector.tocoo())
+
         #extract only the top n; n here is 1
         results = extract_topn_from_vector(feature_names,sorted_items,1)
         result = ''
         if results:
             result = next(iter(results))
-        if result != '':
+        if result != '' and not result.isdigit():
+            result = morph.parse(result)[0].normal_form
+        if len(result) > 2:
             keyword = KeyWord(data_post.id, result, 1)
-            keywords.append(keyword) 
-        
+            keywords.append(keyword)
     return data_posts, keywords
 
 if __name__ == '__main__':
+    os.environ["PATH"] += os.pathsep + 'C:\\Program Files (x86)\\Graphviz2.38\\bin'
     common_keywords = []
     data_posts = []
     common_keywords.extend(parse_group('34183390')[1]) #https://vk.com/public34183390
     data_posts.extend(parse_group('34183390')[0]) #https://vk.com/public34183390
-
     common_keywords.extend(parse_group('54767216')[1]) #https://vk.com/kraschp
     data_posts.extend(parse_group('54767216')[0]) #https://vk.com/public34183390
-
     common_keywords.extend(parse_group('59804801')[1]) #https://vk.com/krsk_overhear
     data_posts.extend(parse_group('59804801')[0]) #https://vk.com/public34183390
-
     get_formal_concepts(data_posts, common_keywords)
-
-#app = QtWidgets.QApplication([])
- 
-#application = mywindow()
- #application.show()
- #sys.exit(app.exec())
